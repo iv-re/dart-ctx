@@ -1,0 +1,11 @@
+name: ctx
+description: Immutable context for carrying data through an application.
+version: 0.0.2
+repository: https://github.com/iv-re/dart-ctx
+
+environment:
+  sdk: ^3.12.1
+
+dev_dependencies:
+  test: ^1.25.6
+  pusk_lints: ^1.0.0

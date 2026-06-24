@@ -1,14 +1,23 @@
 import 'package:ctx/ctx.dart';
 
-void main() {
+void main() async {
+  // Carrying values
   final ctx = const Context.empty()
       .withValue('user', 'alice')
       .withValue('role', 'admin');
 
-  print(ctx['user']); // alice
+  print('User: ${ctx['user']}'); // alice
 
   // Derive a new context without mutating the original:
   final scoped = ctx.withValue('role', 'editor');
-  print(ctx['role']); // admin
-  print(scoped['role']); // editor
+  print('Original role: ${ctx['role']}'); // admin
+  print('Scoped role: ${scoped['role']}'); // editor
+
+  // Cancellation
+  final (cancelCtx, cancel) = ctx.withCancel();
+
+  cancel();
+  await cancelCtx.done;
+
+  print('Canceled? ${cancelCtx.error != null}'); // true
 }

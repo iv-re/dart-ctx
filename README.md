@@ -1,8 +1,10 @@
 # ctx
 
-An immutable context for carrying data through your application.
+An immutable context for carrying data, deadlines, and cancellation signals through your application.
 
 ## Usage
+
+### Carrying Values
 
 ```dart
 import 'package:ctx/ctx.dart';
@@ -19,4 +21,18 @@ void main() {
   print(ctx['role']);    // admin
   print(scoped['role']); // editor
 }
+```
+
+### Cancellation & Timeouts
+
+```dart
+// Explicit cancellation
+final (ctx, cancel) = Context.empty().withCancel();
+cancel();
+
+// Automatic timeout
+final (ctxTimeout, cancelTimeout) = Context.empty().withTimeout(Duration(seconds: 5));
+
+// Non-cancelable branch
+final detached = ctx.withoutCancel();
 ```

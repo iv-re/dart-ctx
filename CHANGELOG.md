@@ -1,3 +1,9 @@
+## 0.0.3
+
+- Added `withCancel` to support context cancellation.
+- Added `withoutCancel` to detach context cancellation from parent.
+- Added `withTimeout` and `withDeadline` for automatic time-based cancellation.
+
 ## 0.0.2
 
 - Changed context key type from `String` to `Object`.

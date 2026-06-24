@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ctx/ctx.dart';
 import 'package:test/test.dart';
 
@@ -68,6 +70,209 @@ void main() {
 
       expect(context[keyObject], 'value_obj');
       expect(context[int], 'value_type');
+    });
+  });
+
+  group('Context.withCancel', () {
+    test(
+      'calling cancel completes done and sets error to ContextCancelException',
+      () async {
+        final (ctx, cancel) = const Context.empty().withCancel();
+
+        cancel();
+
+        await expectLater(ctx.done, completes);
+        expect(ctx.error, isA<ContextCancelException>());
+      },
+    );
+
+    test(
+      'calling cancel with custom exception sets it as the error',
+      () async {
+        final (ctx, cancel) = const Context.empty().withCancel();
+        final customException = Exception('custom reason');
+
+        cancel(customException);
+
+        await expectLater(ctx.done, completes);
+        expect(ctx.error, customException);
+      },
+    );
+
+    test('subsequent cancel calls are ignored', () async {
+      final (ctx, cancel) = const Context.empty().withCancel();
+
+      cancel(Exception('first'));
+      cancel(Exception('second'));
+
+      await expectLater(ctx.done, completes);
+      expect(ctx.error.toString(), contains('first'));
+    });
+
+    test('parent cancellation propagates to child', () async {
+      final (parent, cancelParent) = const Context.empty().withCancel();
+      final (child, _) = parent.withCancel();
+
+      cancelParent();
+
+      await expectLater(child.done, completes);
+      expect(child.error, isA<ContextCancelException>());
+    });
+
+    test(
+      'parent custom exception cancellation propagates to child',
+      () async {
+        final (parent, cancelParent) = const Context.empty().withCancel();
+        final (child, _) = parent.withCancel();
+        final custom = Exception('parent custom');
+
+        cancelParent(custom);
+
+        await expectLater(child.done, completes);
+        expect(child.error, custom);
+      },
+    );
+
+    test(
+      'if parent is already canceled, child is created canceled',
+      () async {
+        final (parent, cancelParent) = const Context.empty().withCancel();
+        cancelParent();
+
+        final (child, _) = parent.withCancel();
+
+        await expectLater(child.done, completes);
+        expect(child.error, isA<ContextCancelException>());
+      },
+    );
+
+    test('inherits values and deadline from parent', () {
+      final parent = const Context.empty().withValue('key', 'val');
+
+      final (child, _) = parent.withCancel();
+
+      expect(child['key'], 'val');
+      expect(child.deadline, isNull);
+    });
+  });
+
+  group('Context.withoutCancel', () {
+    test('does not propagate cancellation from parent', () async {
+      final (parent, cancelParent) = const Context.empty().withCancel();
+      final child = parent.withoutCancel();
+
+      cancelParent();
+      await expectLater(parent.done, completes);
+
+      var childCompleted = false;
+      unawaited(child.done.then((_) => childCompleted = true));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(childCompleted, isFalse);
+      expect(child.error, isNull);
+      expect(child.deadline, isNull);
+    });
+
+    test('inherits values from parent', () {
+      final parent = const Context.empty().withValue('key', 'val');
+
+      final child = parent.withoutCancel();
+
+      expect(child['key'], 'val');
+    });
+  });
+
+  group('Context.withTimeout', () {
+    test('cancels automatically after timeout', () async {
+      final (ctx, _) = const Context.empty().withTimeout(
+        const Duration(milliseconds: 50),
+      );
+
+      await expectLater(ctx.done, completes);
+      expect(ctx.error, isA<ContextTimeoutException>());
+    });
+
+    test('can be canceled explicitly before timeout', () async {
+      final (ctx, cancel) = const Context.empty().withTimeout(
+        const Duration(seconds: 10),
+      );
+
+      cancel();
+
+      await expectLater(ctx.done, completes);
+      expect(ctx.error, isA<ContextCancelException>());
+    });
+
+    test('parent cancellation propagates to timeout child', () async {
+      final (parent, cancelParent) = const Context.empty().withCancel();
+      final (child, _) = parent.withTimeout(const Duration(seconds: 10));
+
+      cancelParent();
+
+      await expectLater(child.done, completes);
+      expect(child.error, isA<ContextCancelException>());
+    });
+
+    test('inherits minimum deadline', () {
+      final now = DateTime.now();
+      final (parent, _) = const Context.empty().withTimeout(
+        const Duration(seconds: 2),
+      );
+
+      final (childShort, _) = parent.withTimeout(const Duration(seconds: 5));
+      final (childLong, _) = parent.withTimeout(const Duration(seconds: 1));
+
+      expect(childShort.deadline, isNotNull);
+      expect(
+        childShort.deadline!.difference(now).inSeconds,
+        closeTo(2, 1),
+      );
+      expect(childLong.deadline, isNotNull);
+      expect(
+        childLong.deadline!.difference(now).inSeconds,
+        closeTo(1, 1),
+      );
+    });
+
+    test(
+      'if parent is already canceled, timeout child is created canceled',
+      () async {
+        final (parent, cancelParent) = const Context.empty().withCancel();
+        cancelParent();
+
+        final (child, _) = parent.withTimeout(const Duration(seconds: 10));
+
+        await expectLater(child.done, completes);
+        expect(child.error, isA<ContextCancelException>());
+      },
+    );
+
+    test('propagates value lookups to parent', () {
+      final parent = const Context.empty().withValue('key', 'val');
+
+      final (child, _) = parent.withTimeout(const Duration(seconds: 10));
+
+      expect(child['key'], 'val');
+    });
+  });
+
+  group('Context.withDeadline', () {
+    test('cancels automatically at deadline', () async {
+      final deadline = DateTime.now().add(const Duration(milliseconds: 50));
+      final (ctx, _) = const Context.empty().withDeadline(deadline);
+
+      await expectLater(ctx.done, completes);
+      expect(ctx.error, isA<ContextTimeoutException>());
+    });
+  });
+
+  group('ContextException', () {
+    test('toString returns the message', () {
+      const exception = ContextCancelException();
+
+      final str = exception.toString();
+
+      expect(str, 'context canceled');
     });
   });
 }

@@ -1,3 +1,7 @@
+## 0.0.4
+
+- Fix memory leak when creating derived contexts via `withCancel()` or `withTimeout()` from uncancelable parent contexts (e.g., `Context.empty()`).
+
 ## 0.0.3
 
 - Added `withCancel` to support context cancellation.

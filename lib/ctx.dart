@@ -71,7 +71,7 @@ class _CancelContext implements Context {
   _CancelContext(this._parent) {
     if (_parent.error != null) {
       _cancel(_parent.error);
-    } else {
+    } else if (!identical(_parent.done, _neverEndingFuture)) {
       _parent.done.whenComplete(() => _cancel(_parent.error));
     }
   }
@@ -129,7 +129,7 @@ class _TimeoutContext implements Context {
 
     if (_parent.error != null) {
       _cancel(_parent.error);
-    } else {
+    } else if (!identical(_parent.done, _neverEndingFuture)) {
       _parent.done.whenComplete(() => _cancel(_parent.error));
     }
   }

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:async' as std;
 
+const Object _contextZoneKey = #_contextZoneKey;
 final Future<void> _neverEndingFuture = Completer<void>().future;
 
 /// Base class for all exceptions related to [Context] cancellation or timeouts.
@@ -34,6 +36,13 @@ abstract class Context {
   /// Creates an empty [Context] that is never canceled, has no values,
   /// and has no deadline.
   const factory Context.empty() = _EmptyContext;
+
+  /// Returns the active [Context] from [Zone.current], or [Context.empty()] if
+  /// no context has been bound to the current zone.
+  // ignore: prefer_constructors_over_static_methods
+  static Context get current {
+    return Zone.current[_contextZoneKey] as Context? ?? const Context.empty();
+  }
 
   /// The time when work done on behalf of this context should be canceled.
   /// Returns `null` if no deadline is set.
@@ -267,5 +276,57 @@ extension ContextExtensions on Context {
   (Context, ContextCancelFn) withDeadline(DateTime deadline) {
     final timeout = deadline.difference(DateTime.now());
     return withTimeout(timeout);
+  }
+
+  /// Executes [action] inside a new [Zone] where [Context.current] is set
+  /// to this context.
+  ///
+  /// ```dart
+  /// final ctx = Context.empty().withValue('user', 'alice');
+  /// ctx.run(() {
+  ///   print(Context.current['user']); // alice
+  /// });
+  /// ```
+  R run<R>(R Function() action) {
+    return runZoned(action);
+  }
+
+  /// Executes [action] inside a new [Zone] where [Context.current] is set
+  /// to this context, with optional custom [zoneValues] and
+  /// [zoneSpecification].
+  R runZoned<R>(
+    R Function() action, {
+    Map<Object?, Object?>? zoneValues,
+    ZoneSpecification? zoneSpecification,
+  }) {
+    return std.runZoned(
+      action,
+      zoneValues: {
+        ...?zoneValues,
+        _contextZoneKey: this,
+      },
+      zoneSpecification: zoneSpecification,
+    );
+  }
+
+  /// Executes [action] inside a new [Zone] where [Context.current] is set
+  /// to this context, handling uncaught errors with [onError].
+  R? runZonedGuarded<R>(
+    R Function() action,
+    void Function(Object error, StackTrace stack) onError, {
+    Map<Object?, Object?>? zoneValues,
+    ZoneSpecification? zoneSpecification,
+  }) {
+    return std.runZonedGuarded(
+      action,
+      (error, stack) {
+        run(() => onError(error, stack));
+      },
+      zoneValues: {
+        ...?zoneValues,
+        _contextZoneKey: this,
+      },
+      zoneSpecification: zoneSpecification,
+    );
   }
 }

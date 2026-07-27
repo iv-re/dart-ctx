@@ -36,3 +36,15 @@ final (ctxTimeout, cancelTimeout) = Context.empty().withTimeout(Duration(seconds
 // Non-cancelable branch
 final detached = ctx.withoutCancel();
 ```
+
+### Zone Propagation
+
+You can propagate a context implicitly down an execution tree using `run`:
+
+```dart
+final ctx = Context.empty().withValue('user', 'alice');
+
+ctx.run(() {
+  print(Context.current['user']); // alice
+});
+```

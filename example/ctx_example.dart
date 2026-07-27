@@ -20,4 +20,9 @@ void main() async {
   await cancelCtx.done;
 
   print('Canceled? ${cancelCtx.error != null}'); // true
+
+  // Zone propagation
+  ctx.run(() {
+    print('Current user from Zone: ${Context.current['user']}'); // alice
+  });
 }

@@ -1,3 +1,9 @@
+## 1.0.0
+
+- Added `Zone` support for ambient context propagation:
+  - Added `Context.current` static getter to access active context from `Zone.current`.
+  - Added `run()`, `runZoned()`, and `runZonedGuarded()` methods on `Context`.
+
 ## 0.0.4
 
 - Fix memory leak when creating derived contexts via `withCancel()` or `withTimeout()` from uncancelable parent contexts (e.g., `Context.empty()`).

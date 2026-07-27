@@ -275,4 +275,98 @@ void main() {
       expect(str, 'context canceled');
     });
   });
+
+  group('Context Zone support', () {
+    test(
+      'Context.current defaults to Context.empty() outside a context zone',
+      () {
+        expect(Context.current, isA<Context>());
+        expect(Context.current['key'], isNull);
+      },
+    );
+
+    test('ctx.run binds Context.current inside zone', () {
+      final ctx = const Context.empty().withValue('user', 'alice');
+
+      ctx.run(() {
+        expect(Context.current['user'], 'alice');
+        expect(identical(Context.current, ctx), isTrue);
+      });
+    });
+
+    test('nested ctx.run shadows outer context', () {
+      final outer = const Context.empty().withValue('role', 'admin');
+      final inner = outer.withValue('role', 'editor');
+
+      outer.run(() {
+        expect(Context.current['role'], 'admin');
+
+        inner.run(() {
+          expect(Context.current['role'], 'editor');
+        });
+
+        expect(Context.current['role'], 'admin');
+      });
+    });
+
+    test('ctx.runZoned preserves custom zoneValues', () {
+      final ctx = const Context.empty().withValue('key', 'val');
+      const extraKey = #extra;
+
+      ctx.runZoned(
+        () {
+          expect(Context.current['key'], 'val');
+          expect(Zone.current[extraKey], 'extra_val');
+        },
+        zoneValues: {extraKey: 'extra_val'},
+      );
+    });
+
+    test(
+      'ctx.runZonedGuarded catches errors with bound Context.current',
+      () async {
+        final ctx = const Context.empty().withValue('id', 99);
+        final completer = Completer<Object>();
+
+        ctx.runZonedGuarded(
+          () {
+            expect(Context.current['id'], 99);
+            throw StateError('zone error');
+          },
+          (error, stack) {
+            expect(Context.current['id'], 99);
+            completer.complete(error);
+          },
+        );
+
+        final error = await completer.future;
+        expect(error, isA<StateError>());
+      },
+    );
+
+    test('ctx.run returns the result of action', () {
+      const ctx = Context.empty();
+
+      final syncResult = ctx.run(() => 42);
+      expect(syncResult, 42);
+    });
+
+    test(
+      'chaining Context.current.withValue inside a zone preserves outer values',
+      () {
+        final outer = const Context.empty().withValue('outer_key', 'outer_val');
+
+        outer.run(() {
+          expect(Context.current['outer_key'], 'outer_val');
+
+          Context.current.withValue('inner_key', 'inner_val').run(() {
+            expect(Context.current['outer_key'], 'outer_val');
+            expect(Context.current['inner_key'], 'inner_val');
+          });
+
+          expect(Context.current['inner_key'], isNull);
+        });
+      },
+    );
+  });
 }
